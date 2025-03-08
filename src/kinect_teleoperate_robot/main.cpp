@@ -34,8 +34,8 @@ using namespace std::chrono;
 
 bool s_isRunning = true;
 
-#define Control_G1 false
-#define Control_H1 true
+#define Control_G1 true
+#define Control_H1 false
 #define Real_Control false    // control real unitree robot in reality
 #define Enable_Torso false    // enable torso rotation angle mapping. Test function, open with caution!
 #define Enable_Hand  false    // enable hand opening and closing status detection. Test function, open with caution!
