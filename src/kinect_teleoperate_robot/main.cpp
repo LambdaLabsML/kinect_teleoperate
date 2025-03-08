@@ -829,13 +829,13 @@ void Control_loop() {
         {
             // smoothing
             left_shoulder_roll = ls_r_filter.update(left_shoulder_roll); // this is left_shoulder_roll, but didn't get send to the robot
-            left_shoulder_pitch = ls_p_filter.update(left_shoulder_pitch) * 0; // this seems to be left_shoulder_roll
-            left_shoulder_yaw = ls_y_filter.update(left_shoulder_yaw) * 0; // this left_shoulder_yaw, work correctly
-            right_shoulder_roll = rs_r_filter.update(right_shoulder_roll) * 0;
-            right_shoulder_pitch = rs_p_filter.update(right_shoulder_pitch) * 0;
-            right_shoulder_yaw = rs_y_filter.update(right_shoulder_yaw) * 0;
-            left_elbow_yaw = le_y_filter.update(left_elbow_yaw) * 0; // this is left_elbow_yaw, correct
-            right_elbow_yaw = re_y_filter.update(right_elbow_yaw) * 0;
+            left_shoulder_pitch = ls_p_filter.update(left_shoulder_pitch); // this seems to be left_shoulder_roll
+            left_shoulder_yaw = ls_y_filter.update(left_shoulder_yaw); // this left_shoulder_yaw, work correctly
+            right_shoulder_roll = rs_r_filter.update(right_shoulder_roll);
+            right_shoulder_pitch = rs_p_filter.update(right_shoulder_pitch);
+            right_shoulder_yaw = rs_y_filter.update(right_shoulder_yaw);
+            left_elbow_yaw = le_y_filter.update(left_elbow_yaw); // this is left_elbow_yaw, correct
+            right_elbow_yaw = re_y_filter.update(right_elbow_yaw);
             #if Enable_Torso
             spine_chest_torso = sc_p_filter.update(spine_chest_torso);
             #endif
@@ -864,8 +864,8 @@ void Control_loop() {
             #if Real_Control
             #if Control_H1
             H1_hardware_signal.left_shoulder_pitch = left_shoulder_yaw;
-            H1_hardware_signal.left_shoulder_roll = left_shoulder_roll;
-            H1_hardware_signal.left_shoulder_yaw = left_shoulder_pitch;
+            H1_hardware_signal.left_shoulder_roll = left_shoulder_pitch;
+            H1_hardware_signal.left_shoulder_yaw = left_shoulder_roll;
             H1_hardware_signal.right_shoulder_pitch = right_shoulder_yaw;
             H1_hardware_signal.right_shoulder_roll = right_shoulder_pitch;
             H1_hardware_signal.right_shoulder_yaw = right_shoulder_roll;
@@ -873,8 +873,8 @@ void Control_loop() {
             H1_hardware_signal.right_elbow_yaw = right_elbow_yaw;
             #elif Control_G1
             G1_hardware_signal.left_shoulder_pitch = left_shoulder_yaw;
-            G1_hardware_signal.left_shoulder_roll = left_shoulder_roll;
-            G1_hardware_signal.left_shoulder_yaw = left_shoulder_pitch;
+            G1_hardware_signal.left_shoulder_roll = left_shoulder_pitch;
+            G1_hardware_signal.left_shoulder_yaw = left_shoulder_roll;
             G1_hardware_signal.right_shoulder_pitch = right_shoulder_yaw;
             G1_hardware_signal.right_shoulder_roll = right_shoulder_pitch;
             G1_hardware_signal.right_shoulder_yaw = right_shoulder_roll;
