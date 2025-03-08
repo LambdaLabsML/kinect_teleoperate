@@ -13,6 +13,8 @@ set(MuJoCo_Libraries mujoco)
 link_directories(
     ${MuJoCo_Library_Dir}
     ${hx_idl_cpp_Include_Dir}
+    /home/ubuntu/unitree_sdk2/lib/x86_64
+    /home/ubuntu/unitree_sdk2/thirdparty/lib/x86_64
 )
 
 add_executable(kinect_teleoperate main.cpp)
@@ -22,6 +24,9 @@ target_include_directories(kinect_teleoperate
     ../sample_helper_includes 
     ${MuJoCo_Include_Dir}
     include/
+    /home/ubuntu/unitree_sdk2/include
+    /home/ubuntu/unitree_sdk2/thirdparty/include
+    /home/ubuntu/unitree_sdk2/thirdparty/include/ddscxx
     # unitree_sdk2
 )
 
@@ -34,6 +39,9 @@ target_link_libraries(kinect_teleoperate PRIVATE
     glfw::glfw
     ${MuJoCo_Libraries}
     Eigen3::Eigen
-    # unitree_sdk2
+    unitree_sdk2
+    ddsc
+    ddscxx
+    pthread
 )
 

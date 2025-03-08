@@ -21,6 +21,7 @@
 #include <mujoco/mujoco.h>
 #include <GLFW/glfw3.h>
 
+#include <unitree/robot/g1/loco/g1_loco_client.hpp>
 
 // For math tool
 #include "math_tool.hpp"
