@@ -188,6 +188,35 @@ inline uint32_t Crc32Core(uint32_t *ptr, uint32_t len) {
    return CRC32;
 }
 
+// kinect body tracking skeleton joint angle
+// reference: https://learn.microsoft.com/en-us/azure/kinect-dk/body-joints
+// ':=' means that the item on the left hand side is being defined to be what is on the right hand side.
+// sc:=spine chest, ls:=left shoulder, le:=left elbow, rs:=right shoulder, re:=right elbow, lh:=left hand, rh:=right hand
+// _r:=roll, _p:=pitch, _y:=yaw, _a:=angle
+static float sc_r, sc_p, sc_y, ls_r, ls_p, ls_y, le_r, le_p, le_y, rs_r, rs_p, rs_y, re_r, re_p, re_y, lh_a, rh_a;
+
+struct hardware_control_signal {
+    double left_shoulder_roll = 0.0;
+    double left_shoulder_pitch = 0.0;
+    double left_shoulder_yaw = 0.0;
+    double right_shoulder_roll = 0.0;
+    double right_shoulder_pitch = 0.0;
+    double right_shoulder_yaw = 0.0;
+    double left_elbow_yaw = 0.0;
+    double right_elbow_yaw = 0.0;
+};
+
+
+// For control real robot G1
+#if Control_G1
+hardware_control_signal G1_hardware_signal;
+#endif
+
+// For control real robot H1
+#if Control_H1
+hardware_control_signal H1_hardware_signal;
+#endif
+
 // G1Example class from the ankle swing example, integrated for real robot control
 class G1Example {
  private:
@@ -376,40 +405,39 @@ class G1Example {
                    // Interpolate from current position to 0 based on ratio
                    motor_command_tmp.q_target[i] = (1.0 - ratio) * ms->q[i];
                }
-           } else if (time_ < duration_ * 2) {
-               // [Stage 2]: swing ankles using PR mode (control Ankle Pitch/Roll directly)
-               mode_pr_ = Mode::PR;
-               double t_cycle = time_ - duration_;
-               // Desired oscillation amplitudes
-               double max_P = M_PI * 30.0 / 180.0;  // 30 degrees
-               double max_R = M_PI * 10.0 / 180.0;  // 10 degrees
-               // Oscillate both ankles in phase for Pitch, and opposite phase for Roll
-               double L_P_des = max_P * std::sin(2.0 * M_PI * t_cycle);
-               double L_R_des = max_R * std::sin(2.0 * M_PI * t_cycle);
-               double R_P_des = max_P * std::sin(2.0 * M_PI * t_cycle);
-               double R_R_des = -max_R * std::sin(2.0 * M_PI * t_cycle);
-               // Set targets for ankle joints in PR mode
-               motor_command_tmp.q_target[LeftAnklePitch] = (float)L_P_des;
-               motor_command_tmp.q_target[LeftAnkleRoll]  = (float)L_R_des;
-               motor_command_tmp.q_target[RightAnklePitch] = (float)R_P_des;
-               motor_command_tmp.q_target[RightAnkleRoll]  = (float)R_R_des;
            } else {
-               // [Stage 3]: swing ankles using AB mode (control Ankle A/B joints directly)
-               mode_pr_ = Mode::AB;
-               double t_cycle = time_ - 2 * duration_;
-               // Desired oscillation amplitudes for A/B actuators
-               double max_A = M_PI * 30.0 / 180.0;
-               double max_B = M_PI * 10.0 / 180.0;
-               // Oscillate A and B with a phase offset
-               double L_A_des = +max_A * std::sin(M_PI * t_cycle);
-               double L_B_des = +max_B * std::sin(M_PI * t_cycle + M_PI);
-               double R_A_des = -max_A * std::sin(M_PI * t_cycle);
-               double R_B_des = -max_B * std::sin(M_PI * t_cycle + M_PI);
-               // Set targets for ankle A/B joints
-               motor_command_tmp.q_target[LeftAnkleA] = (float)L_A_des;
-               motor_command_tmp.q_target[LeftAnkleB] = (float)L_B_des;
-               motor_command_tmp.q_target[RightAnkleA] = (float)R_A_des;
-               motor_command_tmp.q_target[RightAnkleB] = (float)R_B_des;
+               // *** New motion capture control ***
+               mode_pr_ = Mode::PR;
+               double t_since = time_ - duration_;
+               double ramp_factor = std::clamp(t_since / 1.0, 0.0, 1.0);
+               float ramp = static_cast<float>(ramp_factor);
+               float scale = 0.5;
+               // Update only the specified joints (shoulders and elbows)
+               motor_command_tmp.q_target[LeftShoulderPitch] = (float) G1_hardware_signal.left_shoulder_pitch * scale;
+               motor_command_tmp.q_target[LeftShoulderRoll]  = (float) G1_hardware_signal.left_shoulder_roll * scale;
+               motor_command_tmp.q_target[LeftShoulderYaw]   = (float) G1_hardware_signal.left_shoulder_yaw * scale;
+               motor_command_tmp.q_target[LeftElbow]         = (float) G1_hardware_signal.left_elbow_yaw * scale;
+               motor_command_tmp.q_target[RightShoulderPitch] = (float) G1_hardware_signal.right_shoulder_pitch * scale;
+               motor_command_tmp.q_target[RightShoulderRoll]  = (float) G1_hardware_signal.right_shoulder_roll * scale;
+               motor_command_tmp.q_target[RightShoulderYaw]   = (float) G1_hardware_signal.right_shoulder_yaw * scale;
+               motor_command_tmp.q_target[RightElbow]         = (float) G1_hardware_signal.right_elbow_yaw * scale;
+               // Dynamically adjust stiffness (kp) and damping (kd) for smooth control
+               motor_command_tmp.kp[LeftShoulderPitch]   = Kp[LeftShoulderPitch] * ramp;
+               motor_command_tmp.kd[LeftShoulderPitch]   = Kd[LeftShoulderPitch] * ramp;
+               motor_command_tmp.kp[LeftShoulderRoll]    = Kp[LeftShoulderRoll] * ramp;
+               motor_command_tmp.kd[LeftShoulderRoll]    = Kd[LeftShoulderRoll] * ramp;
+               motor_command_tmp.kp[LeftShoulderYaw]     = Kp[LeftShoulderYaw] * ramp;
+               motor_command_tmp.kd[LeftShoulderYaw]     = Kd[LeftShoulderYaw] * ramp;
+               motor_command_tmp.kp[LeftElbow]           = Kp[LeftElbow] * ramp;
+               motor_command_tmp.kd[LeftElbow]           = Kd[LeftElbow] * ramp;
+               motor_command_tmp.kp[RightShoulderPitch]  = Kp[RightShoulderPitch] * ramp;
+               motor_command_tmp.kd[RightShoulderPitch]  = Kd[RightShoulderPitch] * ramp;
+               motor_command_tmp.kp[RightShoulderRoll]   = Kp[RightShoulderRoll] * ramp;
+               motor_command_tmp.kd[RightShoulderRoll]   = Kd[RightShoulderRoll] * ramp;
+               motor_command_tmp.kp[RightShoulderYaw]    = Kp[RightShoulderYaw] * ramp;
+               motor_command_tmp.kd[RightShoulderYaw]    = Kd[RightShoulderYaw] * ramp;
+               motor_command_tmp.kp[RightElbow]          = Kp[RightElbow] * ramp;
+               motor_command_tmp.kd[RightElbow]          = Kd[RightElbow] * ramp;
            }
            // Update the command buffer with new targets (to be sent by LowCommandWriter)
            motor_command_buffer_.SetData(motor_command_tmp);
@@ -417,33 +445,8 @@ class G1Example {
    }
 };
 
-// kinect body tracking skeleton joint angle
-// reference: https://learn.microsoft.com/en-us/azure/kinect-dk/body-joints
-// ':=' means that the item on the left hand side is being defined to be what is on the right hand side.
-// sc:=spine chest, ls:=left shoulder, le:=left elbow, rs:=right shoulder, re:=right elbow, lh:=left hand, rh:=right hand
-// _r:=roll, _p:=pitch, _y:=yaw, _a:=angle
-static float sc_r, sc_p, sc_y, ls_r, ls_p, ls_y, le_r, le_p, le_y, rs_r, rs_p, rs_y, re_r, re_p, re_y, lh_a, rh_a;
 
-struct hardware_control_signal {
-    double left_shoulder_roll = 0.0;
-    double left_shoulder_pitch = 0.0;
-    double left_shoulder_yaw = 0.0;
-    double right_shoulder_roll = 0.0;
-    double right_shoulder_pitch = 0.0;
-    double right_shoulder_yaw = 0.0;
-    double left_elbow_yaw = 0.0;
-    double right_elbow_yaw = 0.0;
-};
 
-// For control real robot G1
-#if Control_G1
-hardware_control_signal G1_hardware_signal;
-#endif
-
-// For control real robot H1
-#if Control_H1
-hardware_control_signal H1_hardware_signal;
-#endif
 
 /*************************************************Kinect Render, display human skeleton joint tracking*********************************************/
 
@@ -825,14 +828,14 @@ void Control_loop() {
         else
         {
             // smoothing
-            left_shoulder_roll = ls_r_filter.update(left_shoulder_roll);
-            left_shoulder_pitch = ls_p_filter.update(left_shoulder_pitch);
-            left_shoulder_yaw = ls_y_filter.update(left_shoulder_yaw);
-            right_shoulder_roll = rs_r_filter.update(right_shoulder_roll);
-            right_shoulder_pitch = rs_p_filter.update(right_shoulder_pitch);
-            right_shoulder_yaw = rs_y_filter.update(right_shoulder_yaw);
-            left_elbow_yaw = le_y_filter.update(left_elbow_yaw);
-            right_elbow_yaw = re_y_filter.update(right_elbow_yaw);
+            left_shoulder_roll = ls_r_filter.update(left_shoulder_roll); // this is left_shoulder_roll, but didn't get send to the robot
+            left_shoulder_pitch = ls_p_filter.update(left_shoulder_pitch) * 0; // this seems to be left_shoulder_roll
+            left_shoulder_yaw = ls_y_filter.update(left_shoulder_yaw) * 0; // this left_shoulder_yaw, work correctly
+            right_shoulder_roll = rs_r_filter.update(right_shoulder_roll) * 0;
+            right_shoulder_pitch = rs_p_filter.update(right_shoulder_pitch) * 0;
+            right_shoulder_yaw = rs_y_filter.update(right_shoulder_yaw) * 0;
+            left_elbow_yaw = le_y_filter.update(left_elbow_yaw) * 0; // this is left_elbow_yaw, correct
+            right_elbow_yaw = re_y_filter.update(right_elbow_yaw) * 0;
             #if Enable_Torso
             spine_chest_torso = sc_p_filter.update(spine_chest_torso);
             #endif
