@@ -27,6 +27,7 @@ target_include_directories(kinect_teleoperate
     /home/ubuntu/unitree_sdk2/include
     /home/ubuntu/unitree_sdk2/thirdparty/include
     /home/ubuntu/unitree_sdk2/thirdparty/include/ddscxx
+    /home/ubuntu/unitree_sdk2/example/g1/low_level
     # unitree_sdk2
 )
 
