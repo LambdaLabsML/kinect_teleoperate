@@ -105,12 +105,20 @@ struct MotorState {
 };
 
 // Stiffness (Kp) and Damping (Kd) constants for all G1 joints (from Unitree G1 specs)
+// std::array<float, G1_NUM_MOTOR> Kp = {
+//     60, 60, 60, 100, 40, 40,      // legs
+//     60, 60, 60, 100, 40, 40,      // legs
+//     60, 40, 40,                   // waist
+//     40, 40, 40, 40, 40, 40, 40,   // arms
+//     40, 40, 40, 40, 40, 40, 40    // arms
+// };
+
 std::array<float, G1_NUM_MOTOR> Kp = {
     60, 60, 60, 100, 40, 40,      // legs
     60, 60, 60, 100, 40, 40,      // legs
     60, 40, 40,                   // waist
-    40, 40, 40, 40, 40, 40, 40,   // arms
-    40, 40, 40, 40, 40, 40, 40    // arms
+    10, 10, 10, 10, 10, 10, 10,   // arms
+    10, 10, 10, 10, 10, 10, 10    // arms
 };
 std::array<float, G1_NUM_MOTOR> Kd = {
     1, 1, 1, 2, 1, 1,    // legs
@@ -206,10 +214,32 @@ struct hardware_control_signal {
     double right_elbow_yaw = 0.0;
 };
 
+double joint_limit_scale = 1.0;
+struct joint_limit {
+    double left_shoulder_roll_max = 2.2515 * joint_limit_scale;
+    double left_shoulder_roll_min = -1.5882 * joint_limit_scale;
+    double left_shoulder_pitch_max = 2.6704 * joint_limit_scale;
+    double left_shoulder_pitch_min = -3.0892 * joint_limit_scale;
+    double left_shoulder_yaw_max = 2.618 * joint_limit_scale;
+    double left_shoulder_yaw_min = -2.618 * joint_limit_scale;
+    double right_shoulder_roll_max = 2.2515 * joint_limit_scale;
+    double right_shoulder_roll_min = -1.5882 * joint_limit_scale;
+    double right_shoulder_pitch_max = 2.6704 * joint_limit_scale;
+    double right_shoulder_pitch_min = -3.0892 * joint_limit_scale;
+    double right_shoulder_yaw_max = 2.618 * joint_limit_scale;
+    double right_shoulder_yaw_min = -2.618 * joint_limit_scale;
+    double left_elbow_yaw_max = 2.0944;
+    double left_elbow_yaw_min = -1.0472;
+    double right_elbow_yaw_max = 2.0944;
+    double right_elbow_yaw_min = -1.0472;
+};
+
 
 // For control real robot G1
 #if Control_G1
 hardware_control_signal G1_hardware_signal;
+// Create joint limit instance
+joint_limit limits;
 #endif
 
 // For control real robot H1
@@ -411,7 +441,7 @@ class G1Example {
                double t_since = time_ - duration_;
                double ramp_factor = std::clamp(t_since / 1.0, 0.0, 1.0);
                float ramp = static_cast<float>(ramp_factor);
-               float scale = 0.5;
+               float scale = 1.0;
                // Update only the specified joints (shoulders and elbows)
                motor_command_tmp.q_target[LeftShoulderPitch] = (float) G1_hardware_signal.left_shoulder_pitch * scale;
                motor_command_tmp.q_target[LeftShoulderRoll]  = (float) G1_hardware_signal.left_shoulder_roll * scale;
@@ -421,6 +451,50 @@ class G1Example {
                motor_command_tmp.q_target[RightShoulderRoll]  = (float) G1_hardware_signal.right_shoulder_roll * scale;
                motor_command_tmp.q_target[RightShoulderYaw]   = (float) G1_hardware_signal.right_shoulder_yaw * scale;
                motor_command_tmp.q_target[RightElbow]         = (float) G1_hardware_signal.right_elbow_yaw * scale;
+
+               // Clamp left shoulder values within limits
+               motor_command_tmp.q_target[LeftShoulderPitch] = std::clamp(
+                   motor_command_tmp.q_target[LeftShoulderPitch],
+                   (float)limits.left_shoulder_pitch_min,
+                   (float)limits.left_shoulder_pitch_max);
+
+               motor_command_tmp.q_target[LeftShoulderRoll] = std::clamp(
+                   motor_command_tmp.q_target[LeftShoulderRoll], 
+                   (float)limits.left_shoulder_roll_min,
+                   (float)limits.left_shoulder_roll_max);
+
+               motor_command_tmp.q_target[LeftShoulderYaw] = std::clamp(
+                   motor_command_tmp.q_target[LeftShoulderYaw],
+                   (float)limits.left_shoulder_yaw_min, 
+                   (float)limits.left_shoulder_yaw_max);
+
+               // Clamp right shoulder values within limits
+               motor_command_tmp.q_target[RightShoulderPitch] = std::clamp(
+                   motor_command_tmp.q_target[RightShoulderPitch],
+                   (float)limits.right_shoulder_pitch_min,
+                   (float)limits.right_shoulder_pitch_max);
+
+               motor_command_tmp.q_target[RightShoulderRoll] = std::clamp(
+                   motor_command_tmp.q_target[RightShoulderRoll],
+                   (float)limits.right_shoulder_roll_min,
+                   (float)limits.right_shoulder_roll_max);
+
+               motor_command_tmp.q_target[RightShoulderYaw] = std::clamp(
+                   motor_command_tmp.q_target[RightShoulderYaw],
+                   (float)limits.right_shoulder_yaw_min,
+                   (float)limits.right_shoulder_yaw_max);
+
+               // Clamp elbow values within limits
+               motor_command_tmp.q_target[LeftElbow] = std::clamp(
+                   motor_command_tmp.q_target[LeftElbow],
+                   (float)limits.left_elbow_yaw_min,
+                   (float)limits.left_elbow_yaw_max);
+
+               motor_command_tmp.q_target[RightElbow] = std::clamp(
+                   motor_command_tmp.q_target[RightElbow],
+                   (float)limits.right_elbow_yaw_min,
+                   (float)limits.right_elbow_yaw_max);
+
                // Dynamically adjust stiffness (kp) and damping (kd) for smooth control
                motor_command_tmp.kp[LeftShoulderPitch]   = Kp[LeftShoulderPitch] * ramp;
                motor_command_tmp.kd[LeftShoulderPitch]   = Kd[LeftShoulderPitch] * ramp;
