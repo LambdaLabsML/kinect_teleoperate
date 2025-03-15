@@ -173,6 +173,12 @@ enum G1JointIndex {
    RightWristYaw      = 28  // (Unused for G1 23-DoF)
 };
 
+// Initialize command with default values for only the specified joints (shoulders and elbows)
+int controlledJoints[] = {
+    LeftShoulderPitch, LeftShoulderRoll, LeftShoulderYaw, LeftElbow,
+    RightShoulderPitch, RightShoulderRoll, RightShoulderYaw, RightElbow
+};
+
 // Utility function for CRC calculation (to validate data integrity of LowState and LowCmd messages)
 inline uint32_t Crc32Core(uint32_t *ptr, uint32_t len) {
    uint32_t CRC32 = 0xFFFFFFFF;
@@ -394,15 +400,23 @@ class G1Example {
        // Fetch the latest motor command from the control loop
        std::shared_ptr<const MotorCommand> mc = motor_command_buffer_.GetData();
        if (mc) {
-           // Populate the LowCmd message with desired motor commands
-           for (size_t i = 0; i < G1_NUM_MOTOR; i++) {
-               dds_low_command.motor_cmd()[i].mode() = 1;  // 1: Enable motor, 0: Disable
-               dds_low_command.motor_cmd()[i].tau()  = mc->tau_ff.at(i);
-               dds_low_command.motor_cmd()[i].q()    = mc->q_target.at(i);
-               dds_low_command.motor_cmd()[i].dq()   = mc->dq_target.at(i);
-               dds_low_command.motor_cmd()[i].kp()   = mc->kp.at(i);
-               dds_low_command.motor_cmd()[i].kd()   = mc->kd.at(i);
-           }
+        //    // Populate the LowCmd message with desired motor commands
+        //    for (size_t i = 0; i < G1_NUM_MOTOR; i++) {
+        //        dds_low_command.motor_cmd()[i].mode() = 1;  // 1: Enable motor, 0: Disable
+        //        dds_low_command.motor_cmd()[i].tau()  = mc->tau_ff.at(i);
+        //        dds_low_command.motor_cmd()[i].q()    = mc->q_target.at(i);
+        //        dds_low_command.motor_cmd()[i].dq()   = mc->dq_target.at(i);
+        //        dds_low_command.motor_cmd()[i].kp()   = mc->kp.at(i);
+        //        dds_low_command.motor_cmd()[i].kd()   = mc->kd.at(i);
+        //    }
+        for (int idx : controlledJoints) {
+            dds_low_command.motor_cmd()[idx].mode() = 1;  // 1: Enable motor, 0: Disable
+            dds_low_command.motor_cmd()[idx].tau()  = mc->tau_ff.at(idx);
+            dds_low_command.motor_cmd()[idx].q()    = mc->q_target.at(idx);
+            dds_low_command.motor_cmd()[idx].dq()   = mc->dq_target.at(idx);
+            dds_low_command.motor_cmd()[idx].kp()   = mc->kp.at(idx);
+            dds_low_command.motor_cmd()[idx].kd()   = mc->kd.at(idx);
+        }
            // Compute CRC for LowCmd and write to DDS
            dds_low_command.crc() = Crc32Core((uint32_t *)&dds_low_command, (sizeof(dds_low_command) >> 2) - 1);
            lowcmd_publisher_->Write(dds_low_command);
@@ -418,23 +432,36 @@ class G1Example {
        // Get latest motor state (positions) from buffer
        std::shared_ptr<const MotorState> ms = motor_state_buffer_.GetData();
        // Initialize command with default values (zero positions, set stiffness/damping)
-       for (int i = 0; i < G1_NUM_MOTOR; ++i) {
-           motor_command_tmp.tau_ff[i]   = 0.0f;
-           motor_command_tmp.q_target[i] = 0.0f;
-           motor_command_tmp.dq_target[i] = 0.0f;
-           motor_command_tmp.kp[i] = Kp[i];
-           motor_command_tmp.kd[i] = Kd[i];
+    //    for (int i = 0; i < G1_NUM_MOTOR; ++i) {
+    //        motor_command_tmp.tau_ff[i]   = 0.0f;
+    //        motor_command_tmp.q_target[i] = 0.0f;
+    //        motor_command_tmp.dq_target[i] = 0.0f;
+    //        motor_command_tmp.kp[i] = Kp[i];
+    //        motor_command_tmp.kd[i] = Kd[i];
+    //    }
+
+       for (int idx : controlledJoints) {
+            motor_command_tmp.tau_ff[idx]   = 0.0f;
+            motor_command_tmp.q_target[idx] = 0.0f;
+            motor_command_tmp.dq_target[idx] = 0.0f;
+            motor_command_tmp.kp[idx] = Kp[idx];
+            motor_command_tmp.kd[idx] = Kd[idx];
        }
+
        if (ms) {
            // Increment time by control step
            time_ += control_dt_;
            if (time_ < duration_) {
-               // [Stage 1]: smoothly move robot to zero posture over `duration_` seconds
-               double ratio = std::clamp(time_ / duration_, 0.0, 1.0);
-               for (int i = 0; i < G1_NUM_MOTOR; ++i) {
-                   // Interpolate from current position to 0 based on ratio
-                   motor_command_tmp.q_target[i] = (1.0 - ratio) * ms->q[i];
-               }
+                // [Stage 1]: smoothly move robot to zero posture over `duration_` seconds
+                double ratio = std::clamp(time_ / duration_, 0.0, 1.0);
+            //    for (int i = 0; i < G1_NUM_MOTOR; ++i) {
+            //        // Interpolate from current position to 0 based on ratio
+            //        motor_command_tmp.q_target[i] = (1.0 - ratio) * ms->q[i];
+            //    }
+                for (int idx : controlledJoints) {
+                    // Interpolate from current position to 0 for each controlled joint
+                    motor_command_tmp.q_target[idx] = (1.0 - ratio) * ms->q[idx];
+                }
            } else {
                // *** New motion capture control ***
                mode_pr_ = Mode::PR;

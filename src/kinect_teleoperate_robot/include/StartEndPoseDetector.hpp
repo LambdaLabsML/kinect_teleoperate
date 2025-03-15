@@ -20,7 +20,7 @@ public:
             auto now = high_resolution_clock::now();
             auto elapsed_time = duration_cast<microseconds>(now - last_check_time).count();
             last_check_time = now;
-            float scale = 2.0;
+            float scale = 1.5;
 
             bool in_range = (ls_r > -0.5 * scale && ls_r < 0.5 * scale) && (ls_p > -0.5 * scale && ls_p < 0.5 * scale) && (ls_y > -0.5 * scale && ls_y < 0.5 * scale) &&
                             (rs_r > -0.5 * scale && rs_r < 0.5 * scale) && (rs_p > -0.5 * scale && rs_p < 0.5 * scale) && (rs_y > -0.5 * scale && rs_y < 0.5 * scale) &&
